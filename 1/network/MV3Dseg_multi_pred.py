@@ -95,42 +95,7 @@ class xModalKD(nn.Module):
         return ce_loss + lovasz_loss
 
     def fusion_to_single_KD(self, data_dict, idx):
-        voxel_feat = data_dict['layer_{}'.format(idx)]['voxel_feat']
-        pts_feat = data_dict['pfeat_scale{}'.format(self.scale_list[idx])]
-        voxel_label = data_dict['scale_{}'.format(self.scale_list[idx])]['voxel_label']
 
-        # 3D voxel prediction
-        voxel_pred = self.multihead_3d_classifier[idx](voxel_feat)
-        point_pred = self.point_classifier[idx](pts_feat)
-
-        # modality fusion
-        voxel_entropy = self.calculate_entropy(voxel_pred)
-        point_entropy = self.calculate_entropy(point_pred)
-        weight_point, weight_voxel = self.normalize_weights(point_entropy, voxel_entropy)
-
-        feat_cat = torch.cat([voxel_feat, pts_feat], 1)
-        feat_cat_comp = self.fcs1[idx](feat_cat)
-        feat_weight = torch.sigmoid(self.fcs2[idx](feat_cat_comp))
-        fuse_feat = F.relu(feat_cat_comp * feat_weight) + self.fcs3[idx](feat_cat)
-
-        # fusion prediction
-        fuse_feat_pred = self.multihead_fuse_classifier[idx](fuse_feat)
-        fuse_prob_pred = self.weighted_fusion(point_pred, voxel_pred, weight_point, weight_voxel)
-
-        # Segmentation Loss
-        fuse_prob_loss = self.seg_loss(fuse_prob_pred, voxel_label)
-        fuse_feat_loss = self.seg_loss(fuse_feat_pred, voxel_label)
-        loss = fuse_feat_loss + fuse_prob_loss #* self.lambda_seg2d  # / self.num_scales
-
-        # KL divergence
-        xm_loss = F.kl_div(
-            F.log_softmax(voxel_pred, dim=1),
-            F.softmax(fuse_feat_pred.detach(), dim=1)
-        ) + F.kl_div(
-            F.log_softmax(voxel_pred, dim=1),
-            F.softmax(fuse_prob_pred.detach(), dim=1)
-        )
-        loss += xm_loss * self.lambda_xm
 
         return loss
 
